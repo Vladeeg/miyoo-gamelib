@@ -1,6 +1,6 @@
 #include "math.h"
+
 #include "core.h"
-#include "utils.h"
 
 typedef struct
 {
@@ -512,7 +512,8 @@ Triangle3d InitTriangle3d() {
             0.0f, 0.0f, 0.0f, 1.0f,
             0.0f, 0.0f, 0.0f, 1.0f,
             0.0f, 0.0f, 0.0f, 1.0f,
-        }
+        },
+        .color = COLOR_WHITE
     };
 
     return tri;

@@ -24,22 +24,35 @@
 #define BUTTON_SELECT 	SDLK_RCTRL
 #define BUTTON_START 	SDLK_RETURN
 
-#define BUTTON_A 		SDLK_SPACE
-#define BUTTON_B 		SDLK_LCTRL
-#define BUTTON_X 		SDLK_LSHIFT
-#define BUTTON_Y 		SDLK_LALT
-
-#define BUTTON_L1 		SDLK_e
-#define BUTTON_R1 		SDLK_t
-#define BUTTON_L2 		SDLK_TAB
-#define BUTTON_R2 		SDLK_BACKSPACE
-#define BUTTON_L3 		BUTTON_NA
-#define BUTTON_R3 		BUTTON_NA
-
 #define BUTTON_MENU	 	SDLK_ESCAPE
 #define BUTTON_POWER 	SDLK_POWER
 #define	BUTTON_PLUS		SDLK_RSUPER
 #define	BUTTON_MINUS	SDLK_LSUPER
+
+#ifdef PLATFORM_DESKTOP
+    #define BUTTON_A 		SDLK_d
+    #define BUTTON_B 		SDLK_s
+    #define BUTTON_X 		SDLK_w
+    #define BUTTON_Y 		SDLK_a
+
+    #define BUTTON_L1 		SDLK_q
+    #define BUTTON_R1 		SDLK_e
+    #define BUTTON_L2 		SDLK_z
+    #define BUTTON_R2 		SDLK_c
+#else
+    #define BUTTON_A 		SDLK_SPACE
+    #define BUTTON_B 		SDLK_LCTRL
+    #define BUTTON_X 		SDLK_LSHIFT
+    #define BUTTON_Y 		SDLK_LALT
+    
+    #define BUTTON_L1 		SDLK_e
+    #define BUTTON_R1 		SDLK_t
+    #define BUTTON_L2 		SDLK_TAB
+    #define BUTTON_R2 		SDLK_BACKSPACE
+
+    #define	BUTTON_PLUS		SDLK_PLUS
+    #define	BUTTON_MINUS	SDLK_MINUS
+#endif
 
 ///////////////////////////////
 
@@ -60,40 +73,11 @@
 #define CODE_R1			20
 #define CODE_L2			15
 #define CODE_R2			14
-#define CODE_L3			CODE_NA
-#define CODE_R3			CODE_NA
 
 #define CODE_MENU		1
 #define CODE_POWER		116
 
 #define CODE_PLUS		115
 #define CODE_MINUS		114
-
-///////////////////////////////
-
-#define JOY_UP			JOY_NA
-#define JOY_DOWN		JOY_NA
-#define JOY_LEFT		JOY_NA
-#define JOY_RIGHT		JOY_NA
-
-#define JOY_SELECT		JOY_NA
-#define JOY_START		JOY_NA
-
-#define JOY_A			JOY_NA
-#define JOY_B			JOY_NA
-#define JOY_X			JOY_NA
-#define JOY_Y			JOY_NA
-
-#define JOY_L1			JOY_NA
-#define JOY_R1			JOY_NA
-#define JOY_L2			JOY_NA
-#define JOY_R2			JOY_NA
-#define JOY_L3			JOY_NA
-#define JOY_R3			JOY_NA
-
-#define JOY_MENU		JOY_NA
-#define JOY_POWER		JOY_NA
-#define JOY_PLUS		JOY_NA
-#define JOY_MINUS		JOY_NA
 
 #endif

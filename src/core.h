@@ -7,7 +7,9 @@
 #include "SDL/SDL_ttf.h"
 #include "SDL/SDL_mixer.h"
 
+#include "utils.h"
 #include "buttonmap.h"
+#include "colors.h"
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -16,11 +18,6 @@
 #define MAX_KEYBOARD_KEYS 512
 
 #define AUDIO_CHUNK_SIZE 512
-
-#define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
-#define MAX(x, y) (x > y ? x : y)
-#define MIN(x, y) (x < y ? x : y)
-#define CLAMP(value, low, high) (value < low ? low : (value > high ? high : value))
 
 typedef struct Vector2 {
     union {
@@ -48,6 +45,7 @@ typedef struct Vector3 {
 
 typedef struct Triangle3d {
     Vector3d points[3];
+    SDL_Color color;
 } Triangle3d;
 
 typedef struct Mesh3d {

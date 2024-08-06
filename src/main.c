@@ -3,7 +3,7 @@
 
 #include "kvec.h"
 
-#include "math.h"
+#include "matrix.h"
 #include "core.h"
 
 // Font formatting
@@ -15,11 +15,6 @@ const char *imagePath = "assets/img/battleback8.png";
 const char *fontPath = "assets/font/MMXSNES.ttf";
 const char *bgmPath = "assets/bgm/Mars.wav";
 const char *sfxPath = "assets/sfx/hop.wav";
-
-const SDL_Color COLOR_WHITE = {255, 255, 255};
-const SDL_Color COLOR_GREEN = {0, 255, 0};
-const SDL_Color COLOR_GRAY = {128, 128, 128};
-const SDL_Color COLOR_BLACK = {0, 0, 0};
 
 const int LOOP_MUSIC = 1;
 
@@ -47,7 +42,7 @@ int readIntFromString(char* str, int *cur) {
     return atoi(buf);
 }
 
-bool LoadFromObjectFile(Mesh3d* res, char* filename)
+bool LoadFromObjectFile(Mesh3d *res, char *filename)
 {
     FILE* fp;
     char *line = NULL;
@@ -67,22 +62,15 @@ bool LoadFromObjectFile(Mesh3d* res, char* filename)
 
     while ((read = getline(&line, &len, fp)) != -1)
     {
-        char buf[128];
-
         if (line[0] == 'v')
         {
             if (line[1] != 't') {
                 Vector3d v = MakeVector3d();
 
-                // s >> junk >> v.x >> v.y >> v.z;
                 int cur = 2;
-                float coord;
-                coord = readFloatFromString(line, &cur);
-                v.x = coord;
-                coord = readFloatFromString(line, &cur);
-                v.y = coord;
-                coord = readFloatFromString(line, &cur);
-                v.z = coord;
+                v.x = readFloatFromString(line, &cur);
+                v.y = readFloatFromString(line, &cur);
+                v.z = readFloatFromString(line, &cur);
                 kv_push(Vector3d, verts, v);
             }
         }
@@ -90,15 +78,10 @@ bool LoadFromObjectFile(Mesh3d* res, char* filename)
         if (line[0] == 'f')
         {
             int f[3];
-            // s >> junk >> f[0] >> f[1] >> f[2];
             int cur = 2;
-            float coord;
-            coord = readIntFromString(line, &cur);
-            f[0] = coord;
-            coord = readIntFromString(line, &cur);
-            f[1] = coord;
-            coord = readIntFromString(line, &cur);
-            f[2] = coord;
+            f[0] = readIntFromString(line, &cur);
+            f[1] = readIntFromString(line, &cur);
+            f[2] = readIntFromString(line, &cur);
 
             Triangle3d tri = { kv_A(verts, f[0] - 1), kv_A(verts, f[1] - 1), kv_A(verts, f[2] - 1) };
             kv_push(Triangle3d, tris, tri);
@@ -108,157 +91,154 @@ bool LoadFromObjectFile(Mesh3d* res, char* filename)
     res->polygons = tris.a;
     res->polygonCount = kv_size(tris);
 
+    kv_destroy(verts);
+    free(line);
     fclose(fp);
 
     return true;
 }
 
-
-typedef struct Matrix4
+Vector3d Vector_IntersectPlane(Vector3d plane_p, Vector3d plane_n, Vector3d *lineStart, Vector3d *lineEnd)
 {
-    float m[4][4];
-} Matrix4;
+    // VectorNormalize(&plane_n);
+    float plane_d = -VectorDot(plane_n, plane_p);
+    float ad = VectorDot(*lineStart, plane_n);
+    float bd = VectorDot(*lineEnd, plane_n);
+    float t = (-plane_d - ad) / (bd - ad);
+    Vector3d lineStartToEnd = VectorSub(*lineEnd, *lineStart);
+    Vector3d lineToIntersect = VectorMul(lineStartToEnd, t);
 
-Vector3d Matrix_MultiplyVector(Matrix4 mat, Vector3d in) {
-    Vector3d out = MakeVector3d();
-
-    out.x = in.x * mat.m[0][0] + in.y * mat.m[1][0] + in.z * mat.m[2][0] + in.w * mat.m[3][0];
-    out.y = in.x * mat.m[0][1] + in.y * mat.m[1][1] + in.z * mat.m[2][1] + in.w * mat.m[3][1];
-    out.z = in.x * mat.m[0][2] + in.y * mat.m[1][2] + in.z * mat.m[2][2] + in.w * mat.m[3][2];
-    out.w = in.x * mat.m[0][3] + in.y * mat.m[1][3] + in.z * mat.m[2][3] + in.w * mat.m[3][3];
-
-    return out;
+    return VectorAdd(*lineStart, lineToIntersect);
 }
 
-Matrix4 IdentityMatrix() {
-    Matrix4 m = { 0 };
-    m.m[0][0] = 1.0f;
-    m.m[1][1] = 1.0f;
-    m.m[2][2] = 1.0f;
-    m.m[3][3] = 1.0f;
-
-    return m;
-}
-
-Matrix4 Matrix_MakeRotationX(float angleRad) {
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] =  1.0f;
-    matrix.m[1][1] =  cosf(angleRad);
-    matrix.m[1][2] =  sinf(angleRad);
-    matrix.m[2][1] = -sinf(angleRad);
-    matrix.m[2][2] =  cosf(angleRad);
-    matrix.m[3][3] =  1.0f;
-    return matrix;
-}
-
-Matrix4 Matrix_MakeRotationY(float fAngleRad)
+float Vector_PlaneDistance(Vector3d *plane_p, Vector3d *plane_n, Vector3d *p)
 {
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = cosf(fAngleRad);
-    matrix.m[0][2] = sinf(fAngleRad);
-    matrix.m[2][0] = -sinf(fAngleRad);
-    matrix.m[1][1] = 1.0f;
-    matrix.m[2][2] = cosf(fAngleRad);
-    matrix.m[3][3] = 1.0f;
-    return matrix;
-}
+    // VectorNormalize(p);
+    return (VectorDot(*plane_n, *p) - VectorDot(*plane_n, *plane_p));
+};
 
-Matrix4 Matrix_MakeRotationZ(float fAngleRad)
+
+bool globalPrint = false;
+
+// borken
+int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in_tri, Triangle3d *out_tri1, Triangle3d *out_tri2)
 {
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = cosf(fAngleRad);
-    matrix.m[0][1] = sinf(fAngleRad);
-    matrix.m[1][0] = -sinf(fAngleRad);
-    matrix.m[1][1] = cosf(fAngleRad);
-    matrix.m[2][2] = 1.0f;
-    matrix.m[3][3] = 1.0f;
-    return matrix;
-}
+    // Make sure plane normal is indeed normal
+    VectorNormalize(&plane_n);
 
-Matrix4 Matrix_MakeTranslation(float x, float y, float z)
-{
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = 1.0f;
-    matrix.m[1][1] = 1.0f;
-    matrix.m[2][2] = 1.0f;
-    matrix.m[3][3] = 1.0f;
-    matrix.m[3][0] = x;
-    matrix.m[3][1] = y;
-    matrix.m[3][2] = z;
-    return matrix;
-}
+    // Return signed shortest distance from point to plane, plane normal must be normalised
+    // float dist = Vector_PlaneDistance(&plane_p, &plane_n, p);
 
-Matrix4 Matrix_MakeProjection(float fFovDegrees, float fAspectRatio, float fNear, float fFar)
-{
-    float fFovRad = 1.0f / tanf(fFovDegrees * 0.5f / 180.0f * 3.14159f);
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = fAspectRatio * fFovRad;
-    matrix.m[1][1] = fFovRad;
-    matrix.m[2][2] = fFar / (fFar - fNear);
-    matrix.m[3][2] = (-fFar * fNear) / (fFar - fNear);
-    matrix.m[2][3] = 1.0f;
-    matrix.m[3][3] = 0.0f;
-    return matrix;
-}
+    // Create two temporary storage arrays to classify points either side of plane
+    // If distance sign is positive, point lies on "inside" of plane
+    Vector3d inside_points[3]  = { 0 };  int nInsidePointCount = 0;
+    Vector3d outside_points[3] = { 0 }; int nOutsidePointCount = 0;
 
-Matrix4 Matrix_MultiplyMatrix(Matrix4 *m1, Matrix4 *m2) {
-    Matrix4 res = { 0 };
+    // Get signed distance of each point in triangle to plane
+    float d0 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[0]);
+    float d1 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[1]);
+    float d2 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[2]);
 
-    for (int c = 0; c < 4; c++) {
-        for (int r = 0; r < 4; r++) {
-            res.m[r][c] = m1->m[r][0] * m2->m[0][c] +
-                          m1->m[r][1] * m2->m[1][c] +
-                          m1->m[r][2] * m2->m[2][c] +
-                          m1->m[r][3] * m2->m[3][c];
-        }
+    // if (!globalPrint) {
+    //     printf("%f %f %f\n", d0, d1, d2);
+    // }
+
+    if (d0 >= 0) {
+        inside_points[nInsidePointCount++] = in_tri->points[0];
+    } else {
+        outside_points[nOutsidePointCount++] = in_tri->points[0];
+    }
+    if (d1 >= 0) {
+        inside_points[nInsidePointCount++] = in_tri->points[1];
+    } else {
+        outside_points[nOutsidePointCount++] = in_tri->points[1];
+    }
+    if (d2 >= 0) {
+        inside_points[nInsidePointCount++] = in_tri->points[2];
+    } else {
+        outside_points[nOutsidePointCount++] = in_tri->points[2];
     }
 
-    return res;
-}
+    // for (int i = 0; i < nInsidePointCount; i++) {
+    //     if (!globalPrint) {
+    //         printf("inside %f %f %f %f\n", inside_points[i].x, inside_points[i].y, inside_points[i].z, inside_points[i].w);
+    //     }
+    // }
+    // for (int i = 0; i < nOutsidePointCount; i++) {
+    //     if (!globalPrint) {
+    //         printf("inside %f %f %f %f\n", outside_points[i].x, outside_points[i].y, outside_points[i].z, outside_points[i].w);
+    //     }
+    // }
 
-Matrix4 Matrix_PointAt(Vector3d *pos, Vector3d *target, Vector3d *up)
-{
-    // Calculate new forward direction
-    Vector3d newForward = VectorSub(*target, *pos);
-    VectorNormalize(&newForward);
+    // Now classify triangle points, and break the input triangle into 
+    // smaller output triangles if required. There are four possible
+    // outcomes...
 
-    // Calculate new Up direction
-    Vector3d a = VectorMul(newForward, VectorDot(*up, newForward));
-    Vector3d newUp = VectorSub(*up, a);
-    VectorNormalize(&newUp);
+    if (nInsidePointCount == 0)
+    {
+        // All points lie on the outside of plane, so clip whole triangle
+        // It ceases to exist
 
-    // New Right direction is easy, its just cross product
-    Vector3d newRight = VectorCross(newUp, newForward);
+        return 0; // No returned triangles are valid
+    }
 
-    // Construct Dimensioning and Translation Matrix
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = newRight.x;   matrix.m[0][1] = newRight.y;   matrix.m[0][2] = newRight.z;   matrix.m[0][3] = 0.0f;
-    matrix.m[1][0] = newUp.x;      matrix.m[1][1] = newUp.y;      matrix.m[1][2] = newUp.z;      matrix.m[1][3] = 0.0f;
-    matrix.m[2][0] = newForward.x; matrix.m[2][1] = newForward.y; matrix.m[2][2] = newForward.z; matrix.m[2][3] = 0.0f;
-    matrix.m[3][0] = pos->x;       matrix.m[3][1] = pos->y;       matrix.m[3][2] = pos->z;       matrix.m[3][3] = 1.0f;
-    return matrix;
+    if (nInsidePointCount == 3)
+    {
+        // All points lie on the inside of plane, so do nothing
+        // and allow the triangle to simply pass through
+        *out_tri1 = *in_tri;
 
-}
+        return 1; // Just the one returned original triangle is valid
+    }
 
-Matrix4 Matrix_QuickInverse(Matrix4 *m) // Only for Rotation/Translation Matrices
-{
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = m->m[0][0]; matrix.m[0][1] = m->m[1][0]; matrix.m[0][2] = m->m[2][0]; matrix.m[0][3] = 0.0f;
-    matrix.m[1][0] = m->m[0][1]; matrix.m[1][1] = m->m[1][1]; matrix.m[1][2] = m->m[2][1]; matrix.m[1][3] = 0.0f;
-    matrix.m[2][0] = m->m[0][2]; matrix.m[2][1] = m->m[1][2]; matrix.m[2][2] = m->m[2][2]; matrix.m[2][3] = 0.0f;
-    matrix.m[3][0] = -(m->m[3][0] * matrix.m[0][0] + m->m[3][1] * matrix.m[1][0] + m->m[3][2] * matrix.m[2][0]);
-    matrix.m[3][1] = -(m->m[3][0] * matrix.m[0][1] + m->m[3][1] * matrix.m[1][1] + m->m[3][2] * matrix.m[2][1]);
-    matrix.m[3][2] = -(m->m[3][0] * matrix.m[0][2] + m->m[3][1] * matrix.m[1][2] + m->m[3][2] * matrix.m[2][2]);
-    matrix.m[3][3] = 1.0f;
-    return matrix;
-}
+    if (nInsidePointCount == 1 && nOutsidePointCount == 2)
+    {
+        // Triangle should be clipped. As two points lie outside
+        // the plane, the triangle simply becomes a smaller triangle
 
-void PrintMatrix(Matrix4 *mat) {
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            printf("%f ", mat->m[i][j]);
-        }
-        printf("\n");
+        // Copy appearance info to new triangle
+        // out_tri1->col = in_tri->col;
+        // out_tri1->sym = in_tri->sym;
+
+        // The inside point is valid, so keep that...
+        out_tri1->points[0] = inside_points[0];
+
+        // but the two new points are at the locations where the 
+        // original sides of the triangle (lines) intersect with the plane
+        out_tri1->points[1] = Vector_IntersectPlane(plane_p, plane_n, &inside_points[0], &outside_points[0]);
+        out_tri1->points[2] = Vector_IntersectPlane(plane_p, plane_n, &inside_points[0], &outside_points[1]);
+
+        return 1; // Return the newly formed single triangle
+    }
+
+    if (nInsidePointCount == 2 && nOutsidePointCount == 1)
+    {
+        // Triangle should be clipped. As two points lie inside the plane,
+        // the clipped triangle becomes a "quad". Fortunately, we can
+        // represent a quad with two new triangles
+
+        // Copy appearance info to new triangles
+        // out_tri1.col =  in_tri.col;
+        // out_tri1.sym = in_tri.sym;
+
+        // out_tri2.col =  in_tri.col;
+        // out_tri2.sym = in_tri.sym;
+
+        // The first triangle consists of the two inside points and a new
+        // point determined by the location where one side of the triangle
+        // intersects with the plane
+        out_tri1->points[0] = inside_points[0];
+        out_tri1->points[1] = inside_points[1];
+        out_tri1->points[2] = Vector_IntersectPlane(plane_p, plane_n, &inside_points[0], &outside_points[0]);
+
+        // The second triangle is composed of one of he inside points, a
+        // new point determined by the intersection of the other side of the 
+        // triangle and the plane, and the newly created point above
+        out_tri2->points[0] = inside_points[1];
+        out_tri2->points[1] = out_tri1->points[2];
+        out_tri2->points[2] = Vector_IntersectPlane(plane_p, plane_n, &inside_points[1], &outside_points[0]);
+
+        return 2; // Return two newly formed triangles which form a quad
     }
 }
 
@@ -283,50 +263,16 @@ int main(int argc, char **argv) {
     VectorNormalize(&light);
 
     Mesh3d meshCube = { 0 };
-    
-    // printf("xxxxxxxxxxxxxxxx\n");
+
     LoadFromObjectFile(&meshCube, "assets/obj/teapot.obj");
-    
-    // printf("zzzzzzzzzzzzzzzzz\n");
-
-    // Triangle3d polygons[] = {
-
-    //     // SOUTH
-    //     { 0.0f, 0.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f, },
-    //     { 0.0f, 0.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 1.0f,    1.0f, 0.0f, 0.0f, 1.0f, },
-
-    //     // EAST                                                      
-    //     { 1.0f, 0.0f, 0.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f, },
-    //     { 1.0f, 0.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    1.0f, 0.0f, 1.0f, 1.0f, },
-
-    //     // NORTH                                                     
-    //     { 1.0f, 0.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f, },
-    //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f, 1.0f, },
-
-    //     // WEST
-    //     { 0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f, 1.0f, },
-    //     { 0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f, },
-
-    //     // TOP
-    //     { 0.0f, 1.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f, },
-    //     { 0.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f, },
-
-    //     // BOTTOM
-    //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f, },
-    //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f,    1.0f, 0.0f, 0.0f, 1.0f, },
-
-    // };
-
-    // meshCube.polygons = polygons;
-    // meshCube.polygonCount = sizeof(polygons) / sizeof(Triangle3d);
 
     float fTheta = 0.0f;
     float prevSecs = (float)SDL_GetTicks() / 1000.0f;
 
     Matrix4 projMatrix = Matrix_MakeProjection(90.0f, (float)SCREEN_HEIGHT / (float)SCREEN_WIDTH, 0.1f, 1000.0f);
-    PrintMatrix(&projMatrix);
 
     Vector3d camera = {0.0f, 0.0f, 0.0f, 1.0f};
+    float cameraYaw = 0.0f;
 
     bool printed = false;
     bool wireframe = false;
@@ -337,26 +283,59 @@ int main(int argc, char **argv) {
 
         BeginDrawing();
 
-        if (IsKeyDown(BUTTON_A)) {
+        Vector3d upVector = {0.0f, 1.0f, 0.0f, 1.0f};
+        Vector3d targetVector = {0.0f, 0.0f, 1.0f, 1.0f};
+        Matrix4 cameraRot = Matrix_MakeRotationY(cameraYaw);
+        Vector3d lookDir = Matrix_MultiplyVector(cameraRot, targetVector);
+        Vector3d strafeDir = lookDir;
+        strafeDir.y = lookDir.y + 0.1f;
+        strafeDir = VectorCross(strafeDir, lookDir);
+        VectorNormalize(&strafeDir);
+        targetVector = VectorAdd(camera, lookDir);
+
+        if (IsKeyDown(BUTTON_R1)) {
             fTheta += elapsed;
         }
-        if (IsKeyDown(BUTTON_B)) {
+        if (IsKeyDown(BUTTON_L1)) {
             fTheta -= elapsed;
         }
-        if (IsKeyPressed(BUTTON_X)) {
+
+        if (IsKeyPressed(BUTTON_SELECT)) {
             wireframe = !wireframe;
         }
-        if (IsKeyDown(BUTTON_UP)) {
+
+        if (IsKeyDown(BUTTON_X)) {
             camera.y += 8.0f * elapsed;
         }
-        if (IsKeyDown(BUTTON_DOWN)) {
+        if (IsKeyDown(BUTTON_B)) {
             camera.y -= 8.0f * elapsed;
         }
-        if (IsKeyDown(BUTTON_LEFT)) {
+        if (IsKeyDown(BUTTON_Y)) {
             camera.x += 8.0f * elapsed;
         }
-        if (IsKeyDown(BUTTON_RIGHT)) {
+        if (IsKeyDown(BUTTON_A)) {
             camera.x -= 8.0f * elapsed;
+        }
+
+        Vector3d forwardVector = VectorMul(lookDir, 8.0f * elapsed);
+        Vector3d strafeVector = VectorMul(strafeDir, 8.0f * elapsed);
+        if (IsKeyDown(BUTTON_UP)) {
+            camera = VectorAdd(camera, forwardVector);
+        }
+        if (IsKeyDown(BUTTON_DOWN)) {
+            camera = VectorSub(camera, forwardVector);
+        }
+        if (IsKeyDown(BUTTON_LEFT)) {
+            camera = VectorAdd(camera, strafeVector);
+        }
+        if (IsKeyDown(BUTTON_RIGHT)) {
+            camera = VectorSub(camera, strafeVector);
+        }
+        if (IsKeyDown(BUTTON_L2)) {
+            cameraYaw -= 2.0f * elapsed;
+        }
+        if (IsKeyDown(BUTTON_R2)) {
+            cameraYaw += 2.0f * elapsed;
         }
         // if (IsKeyPressed(BUTTON_A)) {
         //     Mix_PlayChannel(-1, sfx, 0);
@@ -375,11 +354,6 @@ int main(int argc, char **argv) {
         matWorld = Matrix_MultiplyMatrix(&matRotZ, &matRotX); // Transform by rotation
         matWorld = Matrix_MultiplyMatrix(&matWorld, &matTrans); // Transform by translation
 
-        Vector3d upVector = {0.0f, 1.0f, 0.0f, 1.0f};
-        Vector3d targetVector = {0.0f, 0.0f, 1.0f, 1.0f};
-        Matrix4 cameraRot = Matrix_MakeRotationY(0.0f);
-        Vector3d lookDir = Matrix_MultiplyVector(cameraRot, targetVector);
-        targetVector = VectorAdd(camera, lookDir);
         Matrix4 cameraMatrix = Matrix_PointAt(&camera, &targetVector, &upVector);
 
         Matrix4 viewMatrix = Matrix_QuickInverse(&cameraMatrix);
@@ -392,6 +366,9 @@ int main(int argc, char **argv) {
 
         // Vector2 pos = {10, 10};
         // DrawTextEx(font, "Hello world", pos, COLOR_WHITE);
+
+        kvec_t(Triangle3d) trianglesToRaster;
+        kv_init(trianglesToRaster);
 
         for (int i = 0; i < meshCube.polygonCount; i++) {
             Triangle3d tri = meshCube.polygons[i];
@@ -407,6 +384,8 @@ int main(int argc, char **argv) {
 
             Vector3d normal = VectorCross(line1, line2);
             VectorNormalize(&normal);
+            float lightIntensity = MAX(0.1f, VectorDot(light, normal));
+            tri.color = (SDL_Color){lightIntensity * 255, lightIntensity * 255, lightIntensity * 255};
 
             Vector3d cameraRay = VectorSub(triTransformed.points[0], camera);
 
@@ -416,53 +395,91 @@ int main(int argc, char **argv) {
                 triViewed.points[1] = Matrix_MultiplyVector(viewMatrix, triTransformed.points[1]);
                 triViewed.points[2] = Matrix_MultiplyVector(viewMatrix, triTransformed.points[2]);
 
-                // Project triangles from 3D --> 2D
-                triProjected.points[0] = Matrix_MultiplyVector(projMatrix, triViewed.points[0]);
-                triProjected.points[1] = Matrix_MultiplyVector(projMatrix, triViewed.points[1]);
-                triProjected.points[2] = Matrix_MultiplyVector(projMatrix, triViewed.points[2]);
-
-                // Scale into view
-                triProjected.points[0] = VectorDiv(triProjected.points[0], triProjected.points[0].w);
-                triProjected.points[1] = VectorDiv(triProjected.points[1], triProjected.points[1].w);
-                triProjected.points[2] = VectorDiv(triProjected.points[2], triProjected.points[2].w);
-
-                // X/Y are inverted so put them back
-                triProjected.points[0].x *= -1.0f;
-                triProjected.points[1].x *= -1.0f;
-                triProjected.points[2].x *= -1.0f;
-                triProjected.points[0].y *= -1.0f;
-                triProjected.points[1].y *= -1.0f;
-                triProjected.points[2].y *= -1.0f;
-
-                // Offset verts into visible normalised space
-                Vector3d vOffsetView = { 1, 1, 0, 1.0f };
-                triProjected.points[0] = VectorAdd(triProjected.points[0], vOffsetView);
-                triProjected.points[1] = VectorAdd(triProjected.points[1], vOffsetView);
-                triProjected.points[2] = VectorAdd(triProjected.points[2], vOffsetView);
-                triProjected.points[0].x *= 0.5f * (float)SCREEN_WIDTH;
-                triProjected.points[0].y *= 0.5f * (float)SCREEN_HEIGHT;
-                triProjected.points[1].x *= 0.5f * (float)SCREEN_WIDTH;
-                triProjected.points[1].y *= 0.5f * (float)SCREEN_HEIGHT;
-                triProjected.points[2].x *= 0.5f * (float)SCREEN_WIDTH;
-                triProjected.points[2].y *= 0.5f * (float)SCREEN_HEIGHT;
-
-                float lightIntensity = MAX(0.1f, VectorDot(light, normal));
-
-                FillTriangle(
-                    (int)triProjected.points[0].x, (int)triProjected.points[0].y,
-                    (int)triProjected.points[1].x, (int)triProjected.points[1].y,
-                    (int)triProjected.points[2].x, (int)triProjected.points[2].y,
-                    (SDL_Color){lightIntensity * 255, lightIntensity * 255, lightIntensity * 255}
-                    // COLOR_GRAY
+                // if (!printed) {
+                //     printf("triview %f %f %f | %f %f %f | %f %f %f \n",
+                //         triViewed.points[0].x, triViewed.points[0].y, triViewed.points[0].z,
+                //         triViewed.points[1].x, triViewed.points[1].y, triViewed.points[1].z,
+                //         triViewed.points[2].x, triViewed.points[2].y, triViewed.points[2].z
+                //     );
+                // }
+                int clippedTriangles = 0;
+                Triangle3d clipped[2] = { 0 };
+                clippedTriangles = Triangle_ClipAgainstPlane(
+                    (Vector3d){0.0f, 0.0f, 0.1f, 1.0f}, (Vector3d){0.0f, 0.0f, 1.0f, 1.0f},
+                    &triViewed, &clipped[0], &clipped[1]
                 );
-                if (wireframe) {
-                    DrawTriangle(triProjected, COLOR_GREEN);
+                globalPrint = true;
+                // int clippedTriangles = 1;
+                // Triangle3d clipped[2];
+                // clipped[0] = triViewed;
+
+                for (int n = 0; n < clippedTriangles; n++) {
+                    // if (!printed) {
+                    //     printf("clipped[%d] %f %f %f | %f %f %f | %f %f %f \n", n,
+                    //         clipped[n].points[0].x, clipped[n].points[0].y, clipped[n].points[0].z,
+                    //         clipped[n].points[1].x, clipped[n].points[1].y, clipped[n].points[1].z,
+                    //         clipped[n].points[2].x, clipped[n].points[2].y, clipped[n].points[2].z
+                    //     );
+                    // }
+                    // Project triangles from 3D --> 2D
+                    triProjected.points[0] = Matrix_MultiplyVector(projMatrix, clipped[n].points[0]);
+                    triProjected.points[1] = Matrix_MultiplyVector(projMatrix, clipped[n].points[1]);
+                    triProjected.points[2] = Matrix_MultiplyVector(projMatrix, clipped[n].points[2]);
+
+                    // Scale into view
+                    triProjected.points[0] = VectorDiv(triProjected.points[0], triProjected.points[0].w);
+                    triProjected.points[1] = VectorDiv(triProjected.points[1], triProjected.points[1].w);
+                    triProjected.points[2] = VectorDiv(triProjected.points[2], triProjected.points[2].w);
+
+                    // X/Y are inverted so put them back
+                    triProjected.points[0].x *= -1.0f;
+                    triProjected.points[1].x *= -1.0f;
+                    triProjected.points[2].x *= -1.0f;
+                    triProjected.points[0].y *= -1.0f;
+                    triProjected.points[1].y *= -1.0f;
+                    triProjected.points[2].y *= -1.0f;
+
+                    // Offset verts into visible normalised space
+                    Vector3d vOffsetView = { 1, 1, 0, 1.0f };
+                    triProjected.points[0] = VectorAdd(triProjected.points[0], vOffsetView);
+                    triProjected.points[1] = VectorAdd(triProjected.points[1], vOffsetView);
+                    triProjected.points[2] = VectorAdd(triProjected.points[2], vOffsetView);
+                    triProjected.points[0].x *= 0.5f * (float)SCREEN_WIDTH;
+                    triProjected.points[0].y *= 0.5f * (float)SCREEN_HEIGHT;
+                    triProjected.points[1].x *= 0.5f * (float)SCREEN_WIDTH;
+                    triProjected.points[1].y *= 0.5f * (float)SCREEN_HEIGHT;
+                    triProjected.points[2].x *= 0.5f * (float)SCREEN_WIDTH;
+                    triProjected.points[2].y *= 0.5f * (float)SCREEN_HEIGHT;
+
+                    triProjected.color = tri.color;
+
+                    kv_push(Triangle3d, trianglesToRaster, triProjected);
                 }
+
+                printed = true;
             }
         }
 
+        for (int i = 0; i < kv_size(trianglesToRaster); i++) {
+            Triangle3d tri = kv_A(trianglesToRaster, i);
+
+            FillTriangle(
+                (int)tri.points[0].x, (int)tri.points[0].y,
+                (int)tri.points[1].x, (int)tri.points[1].y,
+                (int)tri.points[2].x, (int)tri.points[2].y,
+                tri.color
+            );
+            if (wireframe) {
+                DrawTriangle(tri, COLOR_GREEN);
+            }
+        }
+
+        kv_destroy(trianglesToRaster);
+
         EndDrawing();
     }
+    free(meshCube.polygons);
+
     Mix_HaltChannel(-1);
 
     Mix_FreeChunk(sfx);

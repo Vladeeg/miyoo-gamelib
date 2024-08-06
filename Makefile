@@ -11,7 +11,7 @@ MIYOO_TARGET_EXEC := app.miyoo.bin
 
 UBUNTU_CXX := g++
 UBUNTU_PREFIX := /
-UBUNTU_CXXFLAGS := -I$(UBUNTU_PREFIX)/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT -O2
+UBUNTU_CXXFLAGS := -I$(UBUNTU_PREFIX)/usr/include/SDL -O2 -D_GNU_SOURCE=1 -D_REENTRANT -DPLATFORM_DESKTOP
 UBUNTU_LDFLAGS := -L$(UBUNTU_PREFIX)/usr/lib -lSDL -lSDL_image -lSDL_ttf -lSDL_mixer -lm -lpthread
 UBUNTU_TARGET_EXEC := app.ubuntu.bin
 
@@ -37,7 +37,7 @@ OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 
 bin/$(TARGET_EXEC): $(OBJS)
 	mkdir -p $(dir $@)
-	$(CXX) $(OBJS) -o bin/$(TARGET_EXEC) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o bin/$(TARGET_EXEC) $(LDFLAGS)
 	cp -r $(ASSETS_DIR) bin
 
 $(BUILD_DIR)/%.c.o: %.c
