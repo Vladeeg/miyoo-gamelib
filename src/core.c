@@ -2,6 +2,9 @@
 
 #include "core.h"
 
+#define MIN_FLOAT -340282346638528859811704183484516925440.0f
+#define MAX_FLOAT 340282346638528859811704183484516925440.0f
+
 typedef struct
 {
     SDL_Surface *video;
@@ -49,7 +52,7 @@ int InitWindow()
         BITS_PER_PIXEL,
         0, 0, 0, 0);
 
-    // platform.depthBuffer = (float*)malloc(sizeof(float) * SCREEN_HEIGHT * SCREEN_WIDTH);
+    platform.depthBuffer = (float*)malloc(sizeof(float) * SCREEN_HEIGHT * SCREEN_WIDTH);
     // for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
     //     platform.depthBuffer[i] = 0.0f;
     // }
@@ -61,7 +64,7 @@ int CloseWindow()
 {
     SDL_FreeSurface(platform.screen);
     SDL_FreeSurface(platform.video);
-    // free(platform.depthBuffer);
+    free(platform.depthBuffer);
 
     Mix_Quit();
     TTF_Quit();
@@ -143,9 +146,9 @@ void PollInputEvents()
 
 int BeginDrawing()
 {
-    // for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
-    //     platform.depthBuffer[i] = 0.0f;
-    // }
+    for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
+        platform.depthBuffer[i] = MIN_FLOAT;
+    }
 
     return 0;
 }
@@ -183,26 +186,43 @@ void DrawTextEx(TTF_Font *font, const char *text, Vector2 position, SDL_Color co
     SDL_FreeSurface(textSurface);
 }
 
-void DrawPixel(int x, int y, SDL_Color color) {
+void DrawPixelDepth(int x, int y, float w, SDL_Color color) {
     if (
            x < 0 || x + 1 > SCREEN_WIDTH
         || y < 0 || y + 1 > SCREEN_HEIGHT
     ) {
         return;
     }
-    Uint32 *pixels = (Uint32*)platform.screen->pixels;
-    pixels[ (y * platform.screen->w) + x ] = SDL_MapRGB(platform.screen->format, color.r, color.g, color.b);
+    if (w > platform.depthBuffer[y * SCREEN_WIDTH + x]) {
+        Uint32 *pixels = (Uint32*)platform.screen->pixels;
+        pixels[ (y * platform.screen->w) + x ] = SDL_MapRGB(platform.screen->format, color.r, color.g, color.b);
+
+        platform.depthBuffer[y * SCREEN_WIDTH + x] = w;
+    }
+}
+
+void DrawPixel(int x, int y, SDL_Color color) {
+    DrawPixelDepth(x, y, 999999, color);
+}
+
+void PutPixelDepth(int x, int y, float w, Uint32 pixel) {
+    if (
+           x < 0 || x + 1 > SCREEN_WIDTH
+        || y < 0 || y + 1 > SCREEN_HEIGHT
+    ) {
+        return;
+    }
+
+    if (w > platform.depthBuffer[y * SCREEN_WIDTH + x]) {
+        Uint32 *pixels = (Uint32*)platform.screen->pixels;
+        pixels[ (y * platform.screen->w) + x ] = pixel;
+
+        platform.depthBuffer[y * SCREEN_WIDTH + x] = w;
+    }
 }
 
 void PutPixel(int x, int y, Uint32 pixel) {
-    if (
-           x < 0 || x + 1 > SCREEN_WIDTH
-        || y < 0 || y + 1 > SCREEN_HEIGHT
-    ) {
-        return;
-    }
-    Uint32 *pixels = (Uint32*)platform.screen->pixels;
-    pixels[ (y * platform.screen->w) + x ] = pixel;
+    PutPixelDepth(x, y, 999999, pixel);
 }
 
 void DrawLine(int startPosX, int startPosY, int endPosX, int endPosY, SDL_Color color)
@@ -238,10 +258,11 @@ void DrawTriangle(Triangle3d triangle, SDL_Color color) {
         points1.x, points1.y, color);
 }
 
+/* unfinished */
 void DrawTexturedTriangle(
-    int x1, int y1, float u1, float v1,
-    int x2, int y2, float u2, float v2,
-    int x3, int y3, float u3, float v3,
+    int x1, int y1, float u1, float v1, float w1,
+    int x2, int y2, float u2, float v2, float w2,
+    int x3, int y3, float u3, float v3, float w3,
     SDL_Surface *tex
 ) {
     if (y2 < y1) {
@@ -249,44 +270,53 @@ void DrawTexturedTriangle(
         SWAP(x1, x2, int);
         SWAP(u1, u2, float);
         SWAP(v1, v2, float);
+        SWAP(w1, w2, float);
     }
     if (y3 < y1) {
         SWAP(y1, y3, int);
         SWAP(x1, x3, int);
         SWAP(u1, u3, float);
         SWAP(v1, v3, float);
+        SWAP(w1, w3, float);
     }
     if (y3 < y2) {
         SWAP(y2, y3, int);
         SWAP(x2, x3, int);
         SWAP(u2, u3, float);
         SWAP(v2, v3, float);
+        SWAP(w2, w3, float);
     }
 
     int dy1   = y2 - y1;
     int dx1   = x2 - x1;
     float dv1 = v2 - v1;
     float du1 = u2 - u1;
+    float dw1 = w2 - w1;
 
     int dy2   = y3 - y1;
     int dx2   = x3 - x1;
+
     float dv2 = v3 - v1;
     float du2 = u3 - u1;
+    float dw2 = w3 - w1;
 
-    float texU, texV;
+    float texU, texV, texW;
 
     float daxStep = 0, dbxStep = 0,
           du1Step = 0, dv1Step = 0,
-          du2Step = 0, dv2Step = 0;
+          du2Step = 0, dv2Step = 0,
+          dw1Step = 0, dw2Step = 0;
 
     if (dy1) daxStep = dx1 / (float)abs(dy1);
     if (dy2) dbxStep = dx2 / (float)abs(dy2);
 
     if (dy1) du1Step = du1 / (float)abs(dy1);
     if (dy1) dv1Step = dv1 / (float)abs(dy1);
+    if (dy1) dw1Step = dw1 / (float)abs(dy1);
 
     if (dy2) du2Step = du2 / (float)abs(dy2);
     if (dy2) dv2Step = dv2 / (float)abs(dy2);
+    if (dy2) dw2Step = dw2 / (float)abs(dw2);
 
     Uint32* pixels = (Uint32*)tex->pixels;
 
@@ -297,18 +327,22 @@ void DrawTexturedTriangle(
 
             float texSu = u1  + (float)(i - y1) * du1Step;
             float texSv = v1  + (float)(i - y1) * dv1Step;
+            float texSw = w1  + (float)(i - y1) * dw1Step;
 
             float texEu = u1  + (float)(i - y1) * du2Step;
             float texEv = v1  + (float)(i - y1) * dv2Step;
+            float texEw = w1  + (float)(i - y1) * dw2Step;
 
             if (ax > bx) {
                 SWAP(ax, bx, int);
                 SWAP(texSu, texEu, float);
                 SWAP(texSv, texEv, float);
+                SWAP(texSw, texEw, float);
             }
 
             texU = texSu;
             texV = texSv;
+            texW = texSw;
 
             float tStep = 1.0f / (float)(bx - ax);
             float t = 0.0f;
@@ -316,13 +350,19 @@ void DrawTexturedTriangle(
             for (int j = ax; j < bx; j++) {
                 texU = (1.0f - t) * texSu + t * texEu;
                 texV = (1.0f - t) * texSv + t * texEv;
+                texW = (1.0f - t) * texSv + t * texEv;
 
-                float sx = texU * tex->w;
-                float sy = texV * tex->h;
+                float sx = (texU / texW) * tex->w;
+                float sy = (texV / texW) * tex->h;
 
                 int coord = (int)(sy * tex->w + sx);
 
-                PutPixel(j, i, pixels[coord]);
+                if (texW > platform.depthBuffer[i * SCREEN_WIDTH + j])
+                {
+                    PutPixel(j, i, pixels[coord]);
+                    // Draw(j, i, tex->SampleGlyph(tex_u / tex_w, tex_v / tex_w), tex->SampleColour(tex_u / tex_w, tex_v / tex_w));
+                    platform.depthBuffer[i * SCREEN_WIDTH + j] = texW;
+                }
 
                 t += tStep;
             }
@@ -381,68 +421,104 @@ void DrawTexturedTriangle(
 }
 
 void FillTriangle(
-    int x1, int y1,
-    int x2, int y2,
-    int x3, int y3,
+    int x1, int y1, float w1,
+    int x2, int y2, float w2,
+    int x3, int y3, float w3,
     SDL_Color color
 ) {
     if (y2 < y1) {
         SWAP(y1, y2, int);
         SWAP(x1, x2, int);
+        SWAP(w1, w2, float);
     }
     if (y3 < y1) {
         SWAP(y1, y3, int);
         SWAP(x1, x3, int);
+        SWAP(w1, w3, float);
     }
     if (y3 < y2) {
         SWAP(y2, y3, int);
         SWAP(x2, x3, int);
+        SWAP(w2, w3, float);
     }
 
-    int dy1   = y2 - y1;
-    int dx1   = x2 - x1;
+    int dy1 = y2 - y1;
+    int dx1 = x2 - x1;
 
-    int dy2   = y3 - y1;
-    int dx2   = x3 - x1;
+    float dw1 = w2 - w1;
 
-    float texU, texV;
+    int dy2 = y3 - y1;
+    int dx2 = x3 - x1;
+
+    float dw2 = w3 - w1;
+
+    float texU, texV, texW;
 
     float daxStep = 0, dbxStep = 0;
 
+    float dw1Step = 0, dw2Step = 0;
+
     if (dy1) daxStep = dx1 / (float)abs(dy1);
     if (dy2) dbxStep = dx2 / (float)abs(dy2);
+
+    if (dy1) dw1Step = dw1 / (float)abs(dy1);
+    if (dy2) dw2Step = dw2 / (float)abs(dy2);
 
     if (dy1) {
         for (int i = y1; i <= y2; i++) {
             int ax = x1 + (float)(i - y1) * daxStep;
             int bx = x1 + (float)(i - y1) * dbxStep;
 
+            float texSw = w1 + (float)(i - y1) * dw1Step;
+            float texEw = w1 + (float)(i - y1) * dw2Step;
+
+            texW = texSw;
+
+            float tstep = 1.0f / ((float)(bx - ax));
+            float t = 0.0f;
+
             if (ax > bx) {
                 SWAP(ax, bx, int);
+                SWAP(texSw, texEw, float);
             }
 
             for (int j = ax; j < bx; j++) {
-                DrawPixel(j, i, color);
+                DrawPixelDepth(j, i, texW, color);
+                t += tstep;
             }
         }
     }
 
     dy1 = y3 - y2;
     dx1 = x3 - x2;
+    dw1 = w3 - w2;
+
     if (dy1) daxStep = dx1 / (float)abs(dy1);
     if (dy2) dbxStep = dx2 / (float)abs(dy2);
+
+    if (dy2) dw1Step = dw1 / (float)abs(dy1);
 
     if (dy1) {
         for (int i = y2; i <= y3; i ++) {
             int ax = x2 + (float)(i - y2) * daxStep;
             int bx = x1 + (float)(i - y1) * dbxStep;
 
+            float texSw = w2 + (float)(i - y1) * dw1Step;
+            float texEw = w1 + (float)(i - y1) * dw2Step;
+
+            texW = texSw;
+
+            float tstep = 1.0f / ((float)(bx - ax));
+            float t = 0.0f;
+
             if (ax > bx) {
                 SWAP(ax, bx, int);
+                SWAP(texSw, texEw, float);
             }
 
             for (int j = ax; j < bx; j++) {
-                DrawPixel(j, i, color);
+                DrawPixelDepth(j, i, texW, color);
+                t += tstep;
             }
         }
     }
@@ -462,7 +538,7 @@ Vector3d VectorAdd(Vector3d v1, Vector3d v2) {
         .x = v1.x + v2.x,
         .y = v1.y + v2.y,
         .z = v1.z + v2.z,
-        .w = 1.0f,
+        .w = v1.w,
     };
 }
 
@@ -471,7 +547,7 @@ Vector3d VectorSub(Vector3d v1, Vector3d v2) {
         .x = v1.x - v2.x,
         .y = v1.y - v2.y,
         .z = v1.z - v2.z,
-        .w = 1.0f,
+        .w = v1.w,
     };
 }
 
@@ -484,7 +560,7 @@ Vector3d VectorDiv(Vector3d v, float k) {
         .x = v.x / k,
         .y = v.y / k,
         .z = v.z / k,
-        .w = 1.0f
+        .w = v.w
     };
 }
 

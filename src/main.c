@@ -117,17 +117,10 @@ float Vector_PlaneDistance(Vector3d *plane_p, Vector3d *plane_n, Vector3d *p)
     return (VectorDot(*plane_n, *p) - VectorDot(*plane_n, *plane_p));
 };
 
-
-bool globalPrint = false;
-
-// borken
 int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in_tri, Triangle3d *out_tri1, Triangle3d *out_tri2)
 {
     // Make sure plane normal is indeed normal
     VectorNormalize(&plane_n);
-
-    // Return signed shortest distance from point to plane, plane normal must be normalised
-    // float dist = Vector_PlaneDistance(&plane_p, &plane_n, p);
 
     // Create two temporary storage arrays to classify points either side of plane
     // If distance sign is positive, point lies on "inside" of plane
@@ -138,10 +131,6 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
     float d0 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[0]);
     float d1 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[1]);
     float d2 = Vector_PlaneDistance(&plane_p, &plane_n, &in_tri->points[2]);
-
-    // if (!globalPrint) {
-    //     printf("%f %f %f\n", d0, d1, d2);
-    // }
 
     if (d0 >= 0) {
         inside_points[nInsidePointCount++] = in_tri->points[0];
@@ -158,17 +147,6 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
     } else {
         outside_points[nOutsidePointCount++] = in_tri->points[2];
     }
-
-    // for (int i = 0; i < nInsidePointCount; i++) {
-    //     if (!globalPrint) {
-    //         printf("inside %f %f %f %f\n", inside_points[i].x, inside_points[i].y, inside_points[i].z, inside_points[i].w);
-    //     }
-    // }
-    // for (int i = 0; i < nOutsidePointCount; i++) {
-    //     if (!globalPrint) {
-    //         printf("inside %f %f %f %f\n", outside_points[i].x, outside_points[i].y, outside_points[i].z, outside_points[i].w);
-    //     }
-    // }
 
     // Now classify triangle points, and break the input triangle into 
     // smaller output triangles if required. There are four possible
@@ -196,10 +174,6 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
         // Triangle should be clipped. As two points lie outside
         // the plane, the triangle simply becomes a smaller triangle
 
-        // Copy appearance info to new triangle
-        // out_tri1->col = in_tri->col;
-        // out_tri1->sym = in_tri->sym;
-
         // The inside point is valid, so keep that...
         out_tri1->points[0] = inside_points[0];
 
@@ -216,13 +190,6 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
         // Triangle should be clipped. As two points lie inside the plane,
         // the clipped triangle becomes a "quad". Fortunately, we can
         // represent a quad with two new triangles
-
-        // Copy appearance info to new triangles
-        // out_tri1.col =  in_tri.col;
-        // out_tri1.sym = in_tri.sym;
-
-        // out_tri2.col =  in_tri.col;
-        // out_tri2.sym = in_tri.sym;
 
         // The first triangle consists of the two inside points and a new
         // point determined by the location where one side of the triangle
@@ -395,32 +362,14 @@ int main(int argc, char **argv) {
                 triViewed.points[1] = Matrix_MultiplyVector(viewMatrix, triTransformed.points[1]);
                 triViewed.points[2] = Matrix_MultiplyVector(viewMatrix, triTransformed.points[2]);
 
-                // if (!printed) {
-                //     printf("triview %f %f %f | %f %f %f | %f %f %f \n",
-                //         triViewed.points[0].x, triViewed.points[0].y, triViewed.points[0].z,
-                //         triViewed.points[1].x, triViewed.points[1].y, triViewed.points[1].z,
-                //         triViewed.points[2].x, triViewed.points[2].y, triViewed.points[2].z
-                //     );
-                // }
                 int clippedTriangles = 0;
                 Triangle3d clipped[2] = { 0 };
                 clippedTriangles = Triangle_ClipAgainstPlane(
                     (Vector3d){0.0f, 0.0f, 0.1f, 1.0f}, (Vector3d){0.0f, 0.0f, 1.0f, 1.0f},
                     &triViewed, &clipped[0], &clipped[1]
                 );
-                globalPrint = true;
-                // int clippedTriangles = 1;
-                // Triangle3d clipped[2];
-                // clipped[0] = triViewed;
 
                 for (int n = 0; n < clippedTriangles; n++) {
-                    // if (!printed) {
-                    //     printf("clipped[%d] %f %f %f | %f %f %f | %f %f %f \n", n,
-                    //         clipped[n].points[0].x, clipped[n].points[0].y, clipped[n].points[0].z,
-                    //         clipped[n].points[1].x, clipped[n].points[1].y, clipped[n].points[1].z,
-                    //         clipped[n].points[2].x, clipped[n].points[2].y, clipped[n].points[2].z
-                    //     );
-                    // }
                     // Project triangles from 3D --> 2D
                     triProjected.points[0] = Matrix_MultiplyVector(projMatrix, clipped[n].points[0]);
                     triProjected.points[1] = Matrix_MultiplyVector(projMatrix, clipped[n].points[1]);
@@ -438,6 +387,9 @@ int main(int argc, char **argv) {
                     triProjected.points[0].y *= -1.0f;
                     triProjected.points[1].y *= -1.0f;
                     triProjected.points[2].y *= -1.0f;
+                    triProjected.points[0].z *= -1.0f;
+                    triProjected.points[1].z *= -1.0f;
+                    triProjected.points[2].z *= -1.0f;
 
                     // Offset verts into visible normalised space
                     Vector3d vOffsetView = { 1, 1, 0, 1.0f };
@@ -464,9 +416,9 @@ int main(int argc, char **argv) {
             Triangle3d tri = kv_A(trianglesToRaster, i);
 
             FillTriangle(
-                (int)tri.points[0].x, (int)tri.points[0].y,
-                (int)tri.points[1].x, (int)tri.points[1].y,
-                (int)tri.points[2].x, (int)tri.points[2].y,
+                (int)tri.points[0].x, (int)tri.points[0].y, tri.points[0].z,
+                (int)tri.points[1].x, (int)tri.points[1].y, tri.points[1].z,
+                (int)tri.points[2].x, (int)tri.points[2].y, tri.points[2].z,
                 tri.color
             );
             if (wireframe) {

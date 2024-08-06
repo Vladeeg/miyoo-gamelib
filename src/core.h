@@ -77,17 +77,17 @@ void DrawPixel(int x, int y, SDL_Color color);
 void PutPixel(int x, int y, Uint32 pixel);
 
 void DrawTexturedTriangle(
-    int x1, int y1, float u1, float v1,
-    int x2, int y2, float u2, float v2,
-    int x3, int y3, float u3, float v3,
+    int x1, int y1, float u1, float v1, float w1,
+    int x2, int y2, float u2, float v2, float w2,
+    int x3, int y3, float u3, float v3, float w3,
     SDL_Surface *tex
 );
 
 void FillTriangle(
-    int x1, int y1,
-    int x2, int y2,
-    int x3, int y3,
-    SDL_Color
+    int x1, int y1, float w1,
+    int x2, int y2, float w2,
+    int x3, int y3, float w3,
+    SDL_Color color
 );
 
 Triangle3d InitTriangle3d();
