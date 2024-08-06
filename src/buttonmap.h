@@ -26,8 +26,6 @@
 
 #define BUTTON_MENU	 	SDLK_ESCAPE
 #define BUTTON_POWER 	SDLK_POWER
-#define	BUTTON_PLUS		SDLK_RSUPER
-#define	BUTTON_MINUS	SDLK_LSUPER
 
 #ifdef PLATFORM_DESKTOP
     #define BUTTON_A 		SDLK_d
@@ -39,6 +37,9 @@
     #define BUTTON_R1 		SDLK_e
     #define BUTTON_L2 		SDLK_z
     #define BUTTON_R2 		SDLK_c
+
+    #define	BUTTON_PLUS		SDLK_PLUS
+    #define	BUTTON_MINUS	SDLK_MINUS
 #else
     #define BUTTON_A 		SDLK_SPACE
     #define BUTTON_B 		SDLK_LCTRL
@@ -50,8 +51,8 @@
     #define BUTTON_L2 		SDLK_TAB
     #define BUTTON_R2 		SDLK_BACKSPACE
 
-    #define	BUTTON_PLUS		SDLK_PLUS
-    #define	BUTTON_MINUS	SDLK_MINUS
+    #define	BUTTON_PLUS		SDLK_RSUPER
+    #define	BUTTON_MINUS	SDLK_LSUPER
 #endif
 
 ///////////////////////////////
