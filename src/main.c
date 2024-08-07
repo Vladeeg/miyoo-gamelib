@@ -7,7 +7,7 @@
 #include "core.h"
 
 // Font formatting
-const int FONT_SIZE = 64;
+const int FONT_SIZE = 24;
 
 // Resource paths
 const char *imagePath = "assets/img/battleback8.png";
@@ -207,10 +207,16 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
 
         return 2; // Return two newly formed triangles which form a quad
     }
+
+    // actually should not be reachable
+    return 0;
 }
 
 int main(int argc, char **argv) {
     InitWindow();
+
+    float elapseds[3] = { 60, 60, 60 };
+    int curElapsed = 0;
 
     Mix_Chunk *sfx = Mix_LoadWAV(sfxPath);
     Mix_Chunk *bgm = Mix_LoadWAV(bgmPath);
@@ -241,6 +247,12 @@ int main(int argc, char **argv) {
     Vector3d camera = {0.0f, 0.0f, 0.0f, 1.0f};
     float cameraYaw = 0.0f;
 
+    Vector3d lookDir = MakeVector3d();
+    Vector3d strafeDir = lookDir;
+
+    Vector3d forwardVector = MakeVector3d();
+    Vector3d strafeVector = MakeVector3d();
+
     bool printed = false;
     bool wireframe = false;
     bool showdepth = false;
@@ -248,18 +260,6 @@ int main(int argc, char **argv) {
         float now = (float)SDL_GetTicks() / 1000.0f;
         float elapsed = now - prevSecs;
         prevSecs = now;
-
-        BeginDrawing();
-
-        Vector3d upVector = {0.0f, 1.0f, 0.0f, 1.0f};
-        Vector3d targetVector = {0.0f, 0.0f, 1.0f, 1.0f};
-        Matrix4 cameraRot = Matrix_MakeRotationY(cameraYaw);
-        Vector3d lookDir = Matrix_MultiplyVector(cameraRot, targetVector);
-        Vector3d strafeDir = lookDir;
-        strafeDir.y = lookDir.y + 0.1f;
-        strafeDir = VectorCross(strafeDir, lookDir);
-        VectorNormalize(&strafeDir);
-        targetVector = VectorAdd(camera, lookDir);
 
         if (IsKeyDown(BUTTON_R1)) {
             fTheta += elapsed;
@@ -289,8 +289,8 @@ int main(int argc, char **argv) {
             camera.x -= 8.0f * elapsed;
         }
 
-        Vector3d forwardVector = VectorMul(lookDir, 8.0f * elapsed);
-        Vector3d strafeVector = VectorMul(strafeDir, 8.0f * elapsed);
+        forwardVector = VectorMul(lookDir, 8.0f * elapsed);
+        strafeVector = VectorMul(strafeDir, 8.0f * elapsed);
         if (IsKeyDown(BUTTON_UP)) {
             camera = VectorAdd(camera, forwardVector);
         }
@@ -309,12 +309,15 @@ int main(int argc, char **argv) {
         if (IsKeyDown(BUTTON_R2)) {
             cameraYaw += 2.0f * elapsed;
         }
+
         // if (IsKeyPressed(BUTTON_A)) {
         //     Mix_PlayChannel(-1, sfx, 0);
         // }
         if (IsKeyPressed(BUTTON_MENU)) {
             done = true;
         }
+
+        BeginDrawing();
 
         // Set up rotation matrices
         Matrix4 matRotZ = Matrix_MakeRotationZ(fTheta * 0.5f);
@@ -326,9 +329,18 @@ int main(int argc, char **argv) {
         matWorld = Matrix_MultiplyMatrix(&matRotZ, &matRotX); // Transform by rotation
         matWorld = Matrix_MultiplyMatrix(&matWorld, &matTrans); // Transform by translation
 
+        Vector3d upVector = {0.0f, 1.0f, 0.0f, 1.0f};
+        Vector3d targetVector = {0.0f, 0.0f, 1.0f, 1.0f};
+        Matrix4 cameraRot = Matrix_MakeRotationY(cameraYaw);
+        lookDir = Matrix_MultiplyVector(cameraRot, targetVector);
+        strafeDir = lookDir;
+        strafeDir.y = lookDir.y + 0.1f;
+        strafeDir = VectorCross(strafeDir, lookDir);
+        VectorNormalize(&strafeDir);
+        targetVector = VectorAdd(camera, lookDir);
         Matrix4 cameraMatrix = Matrix_PointAt(&camera, &targetVector, &upVector);
-
         Matrix4 viewMatrix = Matrix_QuickInverse(&cameraMatrix);
+
 
         // clear screen
         DrawRectangle(NULL, COLOR_BLACK);
@@ -454,8 +466,11 @@ int main(int argc, char **argv) {
                     c, c, c);
             }
         }
-                printed = true;
+        printed = true;
 
+        char str[100];
+        sprintf(str, "%3.2f FPS", 1.0f / elapsed);
+        DrawTextEx(font, str, (Vector2){5, 5}, COLOR_WHITE);
         EndDrawing();
     }
     free(meshCube.polygons);
