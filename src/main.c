@@ -2,6 +2,7 @@
 #include "stdlib.h"
 
 #include "kvec.h"
+#include "deque.h"
 
 #include "matrix.h"
 #include "core.h"
@@ -174,6 +175,8 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
         // Triangle should be clipped. As two points lie outside
         // the plane, the triangle simply becomes a smaller triangle
 
+        out_tri1->color = in_tri->color;
+
         // The inside point is valid, so keep that...
         out_tri1->points[0] = inside_points[0];
 
@@ -190,6 +193,9 @@ int Triangle_ClipAgainstPlane(Vector3d plane_p, Vector3d plane_n, Triangle3d *in
         // Triangle should be clipped. As two points lie inside the plane,
         // the clipped triangle becomes a "quad". Fortunately, we can
         // represent a quad with two new triangles
+
+        out_tri1->color = in_tri->color;
+        out_tri2->color = in_tri->color;
 
         // The first triangle consists of the two inside points and a new
         // point determined by the location where one side of the triangle
@@ -353,6 +359,8 @@ int main(int argc, char **argv) {
 
         kvec_t(Triangle3d) trianglesToRaster;
         kv_init(trianglesToRaster);
+        kdq_t(Triangle3d) trinaglesDeque;
+        kdq_init(trinaglesDeque);
 
         for (int i = 0; i < meshCube.polygonCount; i++) {
             Triangle3d tri = meshCube.polygons[i];
@@ -430,18 +438,59 @@ int main(int argc, char **argv) {
         for (int i = 0; i < kv_size(trianglesToRaster); i++) {
             Triangle3d tri = kv_A(trianglesToRaster, i);
 
-            FillTriangle(
-                (int)tri.points[0].x, (int)tri.points[0].y, tri.points[0].z,
-                (int)tri.points[1].x, (int)tri.points[1].y, tri.points[1].z,
-                (int)tri.points[2].x, (int)tri.points[2].y, tri.points[2].z,
-                tri.color
-            );
-            if (wireframe) {
-                DrawTriangle(tri, COLOR_GREEN);
+            Triangle3d clipped[2];
+            kdq_push(Triangle3d, trinaglesDeque, tri);
+            int newTriangles = 1;
+
+            for (int p = 0; p < 4; p++) {
+                int trisToAdd = 0;
+                while (newTriangles > 0) {
+                    Triangle3d test = kdq_A(trinaglesDeque, 0);
+                    kdq_unshift(trinaglesDeque);
+                    newTriangles--;
+
+                    switch (p)
+                    {
+                    case 0:	trisToAdd = Triangle_ClipAgainstPlane(
+                        (Vector3d){ 0.0f, 0.0f, 0.0f },
+                        (Vector3d){ 0.0f, 1.0f, 0.0f }, &test, &clipped[0], &clipped[1]);
+                        break;
+                    case 1:	trisToAdd = Triangle_ClipAgainstPlane(
+                        (Vector3d){ 0.0f, (float)SCREEN_HEIGHT - 1, 0.0f },
+                        (Vector3d){ 0.0f, -1.0f, 0.0f }, &test, &clipped[0], &clipped[1]);
+                        break;
+                    case 2:	trisToAdd = Triangle_ClipAgainstPlane(
+                        (Vector3d){ 0.0f, 0.0f, 0.0f },
+                        (Vector3d){ 1.0f, 0.0f, 0.0f }, &test, &clipped[0], &clipped[1]);
+                        break;
+                    case 3:	trisToAdd = Triangle_ClipAgainstPlane(
+                        (Vector3d){ (float)SCREEN_WIDTH - 1, 0.0f, 0.0f },
+                        (Vector3d){ -1.0f, 0.0f, 0.0f }, &test, &clipped[0], &clipped[1]);
+                        break;
+                    }
+                    for (int w = 0; w < trisToAdd; w++)
+                        kdq_push(Triangle3d, trinaglesDeque, clipped[w]);
+                }
+                newTriangles = kdq_size(trinaglesDeque);
             }
+
+            for (int i = 0 ; i < kdq_size(trinaglesDeque); i++) {
+                Triangle3d tri = kdq_A(trinaglesDeque, i);
+                FillTriangle(
+                    (int)tri.points[0].x, (int)tri.points[0].y, tri.points[0].z,
+                    (int)tri.points[1].x, (int)tri.points[1].y, tri.points[1].z,
+                    (int)tri.points[2].x, (int)tri.points[2].y, tri.points[2].z,
+                    tri.color
+                );
+                if (wireframe) {
+                    DrawTriangle(tri, COLOR_GREEN);
+                }
+            }
+            kdq_empty(trinaglesDeque);
         }
 
-        kv_destroy(trianglesToRaster);
+        kdq_empty(trinaglesDeque);
+        kv_empty(trianglesToRaster);
 
         if (showdepth) {
             float* depths = Platform_GetDepthBuffer();
@@ -466,6 +515,9 @@ int main(int argc, char **argv) {
                     c, c, c);
             }
         }
+        kdq_destroy(trinaglesDeque);
+        kv_destroy(trianglesToRaster);
+
         printed = true;
 
         char str[100];
