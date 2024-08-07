@@ -243,6 +243,7 @@ int main(int argc, char **argv) {
 
     bool printed = false;
     bool wireframe = false;
+    bool showdepth = false;
     while (!done && !WindowShouldClose()) {
         float now = (float)SDL_GetTicks() / 1000.0f;
         float elapsed = now - prevSecs;
@@ -269,6 +270,10 @@ int main(int argc, char **argv) {
 
         if (IsKeyPressed(BUTTON_SELECT)) {
             wireframe = !wireframe;
+        }
+
+        if (IsKeyPressed(SDLK_0)) {
+            showdepth = !showdepth;
         }
 
         if (IsKeyDown(BUTTON_X)) {
@@ -407,8 +412,6 @@ int main(int argc, char **argv) {
 
                     kv_push(Triangle3d, trianglesToRaster, triProjected);
                 }
-
-                printed = true;
             }
         }
 
@@ -427,6 +430,31 @@ int main(int argc, char **argv) {
         }
 
         kv_destroy(trianglesToRaster);
+
+        if (showdepth) {
+            float* depths = Platform_GetDepthBuffer();
+            float min = MAX_FLOAT;
+            float max = MIN_FLOAT;
+            for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
+                if (depths[i] != MIN_FLOAT) {
+                    if (depths[i] < min) {
+                        min = depths[i];
+                    }
+                    if (depths[i] > max) {
+                        max = depths[i];
+                    }
+                }
+            }
+            Uint32 *pixels = (Uint32*)Platform_GetScreenSurface()->pixels;
+
+            for (int i = 0; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
+                float v = depths[i] == MIN_FLOAT ? min : depths[i];
+                float c = 255 * (v - min) / (max - min);
+                pixels[i] = SDL_MapRGB(Platform_GetScreenSurface()->format,
+                    c, c, c);
+            }
+        }
+                printed = true;
 
         EndDrawing();
     }

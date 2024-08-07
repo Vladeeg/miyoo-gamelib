@@ -2,9 +2,6 @@
 
 #include "core.h"
 
-#define MIN_FLOAT -340282346638528859811704183484516925440.0f
-#define MAX_FLOAT 340282346638528859811704183484516925440.0f
-
 typedef struct
 {
     SDL_Surface *video;
@@ -202,7 +199,7 @@ void DrawPixelDepth(int x, int y, float w, SDL_Color color) {
 }
 
 void DrawPixel(int x, int y, SDL_Color color) {
-    DrawPixelDepth(x, y, 999999, color);
+    DrawPixelDepth(x, y, MAX_FLOAT, color);
 }
 
 void PutPixelDepth(int x, int y, float w, Uint32 pixel) {
@@ -222,7 +219,7 @@ void PutPixelDepth(int x, int y, float w, Uint32 pixel) {
 }
 
 void PutPixel(int x, int y, Uint32 pixel) {
-    PutPixelDepth(x, y, 999999, pixel);
+    PutPixelDepth(x, y, MAX_FLOAT, pixel);
 }
 
 void DrawLine(int startPosX, int startPosY, int endPosX, int endPosY, SDL_Color color)
@@ -472,51 +469,53 @@ void FillTriangle(
             float texSw = w1 + (float)(i - y1) * dw1Step;
             float texEw = w1 + (float)(i - y1) * dw2Step;
 
-            texW = texSw;
-
-            float tstep = 1.0f / ((float)(bx - ax));
-            float t = 0.0f;
-
             if (ax > bx) {
                 SWAP(ax, bx, int);
                 SWAP(texSw, texEw, float);
             }
 
+            texW = texSw;
+
+            float tstep = 1.0f / ((float)(bx - ax));
+            float t = 0.0f;
+
             for (int j = ax; j < bx; j++) {
+                texW = (1.0f - t) * texSw + t * texEw;
                 DrawPixelDepth(j, i, texW, color);
                 t += tstep;
             }
         }
     }
 
-    dy1 = y3 - y2;
     dx1 = x3 - x2;
+    dy1 = y3 - y2;
     dw1 = w3 - w2;
 
     if (dy1) daxStep = dx1 / (float)abs(dy1);
     if (dy2) dbxStep = dx2 / (float)abs(dy2);
 
-    if (dy2) dw1Step = dw1 / (float)abs(dy1);
+    if (dy1) dw1Step = dw1 / (float)abs(dy1);
 
     if (dy1) {
         for (int i = y2; i <= y3; i ++) {
             int ax = x2 + (float)(i - y2) * daxStep;
             int bx = x1 + (float)(i - y1) * dbxStep;
 
-            float texSw = w2 + (float)(i - y1) * dw1Step;
+            float texSw = w2 + (float)(i - y2) * dw1Step;
             float texEw = w1 + (float)(i - y1) * dw2Step;
-
-            texW = texSw;
-
-            float tstep = 1.0f / ((float)(bx - ax));
-            float t = 0.0f;
 
             if (ax > bx) {
                 SWAP(ax, bx, int);
                 SWAP(texSw, texEw, float);
             }
 
+            texW = texSw;
+
+            float tstep = 1.0f / ((float)(bx - ax));
+            float t = 0.0f;
+
             for (int j = ax; j < bx; j++) {
+                texW = (1.0f - t) * texSw + t * texEw;
                 DrawPixelDepth(j, i, texW, color);
                 t += tstep;
             }
