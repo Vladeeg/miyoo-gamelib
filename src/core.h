@@ -84,4 +84,15 @@ void CameraMoveRight(Camera3d* camera, float distance);
 void CameraMoveUp(Camera3d* camera, float distance);
 void CameraYaw(Camera3d *camera, float angle);
 
+void BeginMode3d(Camera3d *camera);
+void EndMode3d();
+
+void SetupLight(Vector3 light);
+void DrawModel(Mesh3d *mesh, Vector3 position);
+
+
+Vector4 Vector_IntersectPlane(Vector4 plane_p, Vector4 plane_n, Vector4 *lineStart, Vector4 *lineEnd);
+float Vector_PlaneDistance(Vector4 *plane_p, Vector4 *plane_n, Vector4 *p);
+int Triangle_ClipAgainstPlane(Vector4 plane_p, Vector4 plane_n, Triangle3d *in_tri, Triangle3d *out_tri1, Triangle3d *out_tri2);
+
 #endif
