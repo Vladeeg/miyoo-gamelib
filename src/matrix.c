@@ -71,8 +71,8 @@ Matrix4 Matrix_MakeProjection(float fFovDegrees, float fAspectRatio, float fNear
     return matrix;
 }
 
-Vector3d Matrix_MultiplyVector(Matrix4 mat, Vector3d in) {
-    Vector3d out = MakeVector3d();
+Vector4 Matrix_MultiplyVector(Matrix4 mat, Vector4 in) {
+    Vector4 out = MakeVector4();
 
     out.x = in.x * mat.m[0][0] + in.y * mat.m[1][0] + in.z * mat.m[2][0] + in.w * mat.m[3][0];
     out.y = in.x * mat.m[0][1] + in.y * mat.m[1][1] + in.z * mat.m[2][1] + in.w * mat.m[3][1];
@@ -97,41 +97,44 @@ Matrix4 Matrix_MultiplyMatrix(Matrix4 *m1, Matrix4 *m2) {
     return res;
 }
 
-Matrix4 Matrix_PointAt(Vector3d *pos, Vector3d *target, Vector3d *up)
+Matrix4 Matrix_LookAt(Vector3 *pos, Vector3 *target, Vector3 *up)
 {
     // Calculate new forward direction
-    Vector3d newForward = VectorSub(*target, *pos);
-    VectorNormalize(&newForward);
+    Vector3 newForward = Vector3Sub(*target, *pos);
+    newForward = Vector3Normalize(&newForward);
 
     // Calculate new Up direction
-    Vector3d a = VectorMul(newForward, VectorDot(*up, newForward));
-    Vector3d newUp = VectorSub(*up, a);
-    VectorNormalize(&newUp);
+    Vector3 a = Vector3Mul(newForward, Vector3DotProduct(*up, newForward));
+    Vector3 newUp = Vector3Sub(*up, a);
+    newUp = Vector3Normalize(&newUp);
 
     // New Right direction is easy, its just cross product
-    Vector3d newRight = VectorCross(newUp, newForward);
+    Vector3 newRight = Vector3CrossProduct(newUp, newForward);
 
     // Construct Dimensioning and Translation Matrix
     Matrix4 matrix = { 0 };
-    matrix.m[0][0] = newRight.x;   matrix.m[0][1] = newRight.y;   matrix.m[0][2] = newRight.z;   matrix.m[0][3] = 0.0f;
-    matrix.m[1][0] = newUp.x;      matrix.m[1][1] = newUp.y;      matrix.m[1][2] = newUp.z;      matrix.m[1][3] = 0.0f;
-    matrix.m[2][0] = newForward.x; matrix.m[2][1] = newForward.y; matrix.m[2][2] = newForward.z; matrix.m[2][3] = 0.0f;
-    matrix.m[3][0] = pos->x;       matrix.m[3][1] = pos->y;       matrix.m[3][2] = pos->z;       matrix.m[3][3] = 1.0f;
-    return matrix;
+    matrix.m[0][0] = newRight.x;
+    matrix.m[0][1] = newUp.x;
+    matrix.m[0][2] = newForward.x;
+    matrix.m[0][3] = 0.0f;
 
-}
+    matrix.m[1][0] = newRight.y;
+    matrix.m[1][1] = newUp.y;
+    matrix.m[1][2] = newForward.y;
+    matrix.m[1][3] = 0.0f;
 
-Matrix4 Matrix_QuickInverse(Matrix4 *m) // Only for Rotation/Translation Matrices
-{
-    Matrix4 matrix = { 0 };
-    matrix.m[0][0] = m->m[0][0]; matrix.m[0][1] = m->m[1][0]; matrix.m[0][2] = m->m[2][0]; matrix.m[0][3] = 0.0f;
-    matrix.m[1][0] = m->m[0][1]; matrix.m[1][1] = m->m[1][1]; matrix.m[1][2] = m->m[2][1]; matrix.m[1][3] = 0.0f;
-    matrix.m[2][0] = m->m[0][2]; matrix.m[2][1] = m->m[1][2]; matrix.m[2][2] = m->m[2][2]; matrix.m[2][3] = 0.0f;
-    matrix.m[3][0] = -(m->m[3][0] * matrix.m[0][0] + m->m[3][1] * matrix.m[1][0] + m->m[3][2] * matrix.m[2][0]);
-    matrix.m[3][1] = -(m->m[3][0] * matrix.m[0][1] + m->m[3][1] * matrix.m[1][1] + m->m[3][2] * matrix.m[2][1]);
-    matrix.m[3][2] = -(m->m[3][0] * matrix.m[0][2] + m->m[3][1] * matrix.m[1][2] + m->m[3][2] * matrix.m[2][2]);
+    matrix.m[2][0] = newRight.z;
+    matrix.m[2][1] = newUp.z;
+    matrix.m[2][2] = newForward.z;
+    matrix.m[2][3] = 0.0f;
+
+    matrix.m[3][0] = -(newRight.x   * pos->x + newRight.y   * pos->y + newRight.z   * pos->z);
+    matrix.m[3][1] = -(newUp.x      * pos->x + newUp.y      * pos->y + newUp.z      * pos->z);
+    matrix.m[3][2] = -(newForward.x * pos->x + newForward.y * pos->y + newForward.z * pos->z);
     matrix.m[3][3] = 1.0f;
+
     return matrix;
+
 }
 
 void PrintMatrix(Matrix4 *mat) {

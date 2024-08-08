@@ -1,6 +1,7 @@
 #include "math.h"
 
 #include "core.h"
+#include "matrix.h"
 
 typedef struct
 {
@@ -240,9 +241,9 @@ void DrawLine(int startPosX, int startPosY, int endPosX, int endPosY, SDL_Color 
 }
 
 void DrawTriangle(Triangle3d triangle, SDL_Color color) {
-    Vector3d points1 = triangle.points[0];
-    Vector3d points2 = triangle.points[1];
-    Vector3d points3 = triangle.points[2];
+    Vector4 points1 = triangle.points[0];
+    Vector4 points2 = triangle.points[1];
+    Vector4 points3 = triangle.points[2];
     
     DrawLine(
         points1.x, points1.y,
@@ -523,62 +524,38 @@ void FillTriangle(
     }
 }
 
-Vector3d MakeVector3d() {
-    return (Vector3d){
-        .x = 0.0f,
-        .y = 0.0f,
-        .z = 0.0f,
-        .w = 1.0f,
-    };
+void CameraMoveForward(Camera3d* camera, float distance) {
+    Vector3 forward = Vector3Sub(camera->target, camera->position);
+    forward = Vector3Mul(forward, distance);
+    camera->position = Vector3Add(camera->position, forward);
+    camera->target = Vector3Add(camera->target, forward);
 }
 
-Vector3d VectorAdd(Vector3d v1, Vector3d v2) {
-    return (Vector3d){
-        .x = v1.x + v2.x,
-        .y = v1.y + v2.y,
-        .z = v1.z + v2.z,
-        .w = v1.w,
-    };
+void CameraMoveRight(Camera3d* camera, float distance) {
+    Vector3 right = Vector3CrossProduct(Vector3Sub(camera->target, camera->position), camera->up);
+    right = Vector3Mul(right, distance);
+    camera->position = Vector3Add(camera->position, right);
+    camera->target = Vector3Add(camera->target, right);
 }
 
-Vector3d VectorSub(Vector3d v1, Vector3d v2) {
-    return (Vector3d){
-        .x = v1.x - v2.x,
-        .y = v1.y - v2.y,
-        .z = v1.z - v2.z,
-        .w = v1.w,
-    };
+void CameraMoveUp(Camera3d* camera, float distance) {
+    Vector3 up = Vector3Mul(camera->up, distance);
+    camera->position = Vector3Add(camera->position, up);
+    camera->target = Vector3Add(camera->target, up);
 }
 
-Vector3d VectorMul(Vector3d v, float k) {
-    return (Vector3d){ v.x * k, v.y * k, v.z * k, 1.0f };
-}
+void CameraYaw(Camera3d *camera, float angle)
+{
+    // Rotation axis
+    Vector3 up = Vector3Normalize(&camera->up);
 
-Vector3d VectorDiv(Vector3d v, float k) {
-    return (Vector3d){
-        .x = v.x / k,
-        .y = v.y / k,
-        .z = v.z / k,
-        .w = v.w
-    };
-}
+    // View vector
+    Vector3 targetPosition = Vector3Sub(camera->target, camera->position);
 
-float VectorDot(Vector3d v1, Vector3d v2) {
-    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-}
+    // Rotate view vector around up axis
+    targetPosition = Vector3RotateByAxisAngle(targetPosition, up, angle);
 
-Vector3d VectorCross(Vector3d v1, Vector3d v2) {
-    return (Vector3d){
-        .x = v1.y * v2.z - v1.z * v2.y,
-        .y = v1.z * v2.x - v1.x * v2.z,
-        .z = v1.x * v2.y - v1.y * v2.x,
-        .w = 1.0f,
-    };
-}
-
-void VectorNormalize(Vector3d *v) {
-    float rl = Q_rsqrt(v->x * v->x + v->y * v->y + v->z * v->z);
-    v->x *= rl; v->y *= rl; v->z *= rl;
+    camera->target = Vector3Add(camera->position, targetPosition);
 }
 
 Triangle3d InitTriangle3d() {

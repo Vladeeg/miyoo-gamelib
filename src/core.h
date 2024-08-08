@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "buttonmap.h"
 #include "colors.h"
+#include "vector.h"
 
 #define MIN_FLOAT -340282346638528859811704183484516925440.0f
 #define MAX_FLOAT 340282346638528859811704183484516925440.0f
@@ -22,32 +23,15 @@
 
 #define AUDIO_CHUNK_SIZE 512
 
-typedef struct Vector2 {
-    union {
-        float x;
-        float u;
-    };
-    union {
-        float y;
-        float v;
-    };
-} Vector2;
-
-typedef struct Vector3d {
-    float x;
-    float y;
-    float z;
-    float w;
-} Vector3d;
-
-typedef struct Vector3 {
-    float x;
-    float y;
-    float z;
-} Vector3;
+typedef struct Camera3d {
+    Vector3 position;
+    Vector3 target;
+    Vector3 up;
+    float fovy;
+} Camera3d;
 
 typedef struct Triangle3d {
-    Vector3d points[3];
+    Vector4 points[3];
     SDL_Color color;
 } Triangle3d;
 
@@ -94,14 +78,10 @@ void FillTriangle(
 );
 
 Triangle3d InitTriangle3d();
-Vector3d MakeVector3d();
 
-Vector3d VectorAdd(Vector3d v1, Vector3d v2);
-Vector3d VectorSub(Vector3d v1, Vector3d v2);
-Vector3d VectorMul(Vector3d v, float k);
-Vector3d VectorDiv(Vector3d v, float k);
-float VectorDot(Vector3d v1, Vector3d v2);
-Vector3d VectorCross(Vector3d v1, Vector3d v2);
-void VectorNormalize(Vector3d *v);
+void CameraMoveForward(Camera3d* camera, float distance);
+void CameraMoveRight(Camera3d* camera, float distance);
+void CameraMoveUp(Camera3d* camera, float distance);
+void CameraYaw(Camera3d *camera, float angle);
 
 #endif
